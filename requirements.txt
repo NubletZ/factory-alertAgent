@@ -4,3 +4,4 @@ scikit-learn>=1.0
 matplotlib>=3.4
 joblib>=1.1
 schedule
+lightbgm
