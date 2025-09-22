@@ -1,5 +1,5 @@
 """
-agent.py - command-line agent that applies rule-based checks and an IsolationForest detector.
+agent.py - command-line agent that applies real time anomaly detection.
 Usage example:
     python agent.py --input data/sensors.csv --output-dir outputs --mode detect
 """
@@ -14,36 +14,22 @@ import os
 
 from preprocess import load_data, preprocess
 from rule_engine import check_row
-from models import train_isolation_forest, score_isolation_forest, save_model, load_model, score_supervised_rf
+from models import save_model, load_model, score_supervised
 from utils import save_csv, save_json, plot_signals
 from generate_data import generate_data
 
 MODEL_PATH = "model/randomforest.pth"
 
-def run_detect(input_csv: str, output_dir: str = None, train_if_no_model: bool = True):
-    # print("Load CSV data..")
+def run_detect(input_csv: str, output_dir: str = None, train_if_no_model: bool = True, verbose: int = 1):
+    if verbose == 2: print("Read sensor input..")
     df = load_data(input_csv).tail(10)
-    # if "timestamp" not in df.columns:
-    #     raise ValueError("Input CSV must contain a 'timestamp' column.")
-    # print("Preprocess the data..")
+    
+    if verbose == 2: print("Preprocess the data..")
     df = preprocess(df)
-    # Path(output_dir).mkdir(parents=True, exist_ok=True)
+    
+    if verbose == 2: print(df.tail(3))
 
-    # Rule-based checks
-    # alerts = []
-    # for i, row in df.iterrows():
-    #     is_anom, suggestions = check_row(row)
-    #     if is_anom:
-    #         alerts.append({
-    #             "timestamp": str(row["timestamp"]),
-    #             "temp": row.get("temp"),
-    #             "pressure": row.get("pressure"),
-    #             "vibration": row.get("vibration"),
-    #             "source": "rule",
-    #             "suggestions": suggestions
-    #         })
-
-    # Prepare features for IsolationForest
+    # Prepare features for classifier
     feat_cols = [c for c in df.columns if any(p in c for p in ["temp","pressure","vibration"])]
     X = df[feat_cols]
 
@@ -52,26 +38,34 @@ def run_detect(input_csv: str, output_dir: str = None, train_if_no_model: bool =
         try:
             model = load_model(MODEL_PATH)
         except Exception:
-            print("The model doesn't exist!")
+            if verbose == 2: print("The model doesn't exist!")
             model = None
 
     if model is None and train_if_no_model:
-        print("Train the model")
+        if verbose == 2: print("Train the model..")
         model = train_supervised_rf(X)
         save_model(model, MODEL_PATH)
 
     if model is not None:
+        # Get the latest data point
         cur_data = X.tail(1)
-        scores, label = score_supervised_rf(model, cur_data)
+        scores, label = score_supervised(model, cur_data)
+        if verbose == 2: 
+            print("----------------------------------------------------------------------------")
+            print("Prediction result:", label)
+            print("Anomaly score:", scores)
+            print()
         status = "NORMAL"
         alert_msg = None
         if label != 'normal':
             status = "ABNORMAL!"
             alert_msg = check_row(cur_data.iloc[0].to_dict())
-        print(f"{np.datetime_as_string(df.timestamp.values[-1], unit='s')} - [{status}] anomaly_score: {scores}, temp: {cur_data.temp.values[0]}, pressure: {cur_data.pressure.values[0]}, vibration: {cur_data.vibration.values[0]}")
+        if verbose > 0: print(f"{np.datetime_as_string(df.timestamp.values[-1], unit='s')} - [{status}] anomaly_score: {scores}, temp: {cur_data.temp.values[0]}, pressure: {cur_data.pressure.values[0]}, vibration: {cur_data.vibration.values[0]}")
         if alert_msg != None:
             print(alert_msg)
             print()
+        if verbose == 2: 
+            print("============================================================================")
 
 def simulate_sensor_data(input_csv: str):
     # Simulate sensor data generation and append to CSV
@@ -83,17 +77,6 @@ def simulate_sensor_data(input_csv: str):
 
     df_to_write = generate_data(rows=1, prev_data=prev_data)
 
-    # # Check if the CSV exists, append or create accordingly
-    # cols = ["timestamp", "temp", "pressure", "vibration", "label"]
-
-    # # Ensure new_df has the required columns and order
-    # df_to_write = new_df.copy()
-    # for c in cols:
-    #     if c not in df_to_write.columns:
-    #         df_to_write[c] = ""
-
-    # df_to_write = df_to_write[cols]
-
     # Normalize timestamp to a consistent string format if possible
     try:
         df_to_write["timestamp"] = pd.to_datetime(df_to_write["timestamp"], errors="coerce").dt.strftime("%Y-%m-%d %H:%M:%S")
@@ -102,45 +85,38 @@ def simulate_sensor_data(input_csv: str):
         df_to_write["timestamp"] = df_to_write["timestamp"].astype(str)
 
     # Append if file exists, otherwise create with header
-    if os.path.exists(csv_path):
-        df_to_write.to_csv(csv_path, mode="a", header=False, index=False)
+    if os.path.exists(input_csv):
+        df_to_write.to_csv(input_csv, mode="a+", header=False, index=False)
     else:
-        df_to_write.to_csv(csv_path, index=False)
+        df_to_write.to_csv(input_csv, index=False)
 
 
 # Schedule the function to run every minute
 def run_cycle(input_csv: str, output_dir: str = None, train_if_no_model: bool = True):
     # run multiple tasks in order; wrap in try/except so one failure doesn't stop subsequent tasks
     try:
-        simulate_sensor_data(csv_path)
+        simulate_sensor_data(input_csv)
     except Exception as e:
         print("simulate_sensor_data failed:", e)
     try:
-        run_detect(csv_path)
+        run_detect(input_csv)
     except Exception as e:
         print("run_detect failed:", e)
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", required=True, help="Path to input CSV")
-    parser.add_argument("--output-dir", default="outputs", help="Directory to write outputs")
-    # parser.add_argument("--mode", choices=["detect"], default="detect")
+    parser.add_argument("--input", default='data/online_stream.csv', help="Path to input CSV")
+    parser.add_argument("--output-dir", default=None, help="Directory to write outputs")
+    parser.add_argument("--train-if-no-model", default=True, help="Bool to train model if no model found")
+    parser.add_argument("--verbose", default=1, help="Integer option: [0, 1, 2], the higher the more logging info")
     args = parser.parse_args()
-    # if args.mode == "detect":
-    #     run_detect(args.input, args.output_dir)
+    schedule.every(0.1).minutes.do(run_cycle, input_csv=args.input, output_dir=args.output_dir, train_if_no_model=args.train_if_no_model)
+    print("Agent started. Running receive sensor input -> detect anomaly every 1 minute...")
+
+    while True:
+        schedule.run_pending()
+        time.sleep(0.1)
 
 if __name__ == "__main__":
     main()
-
-
-# Path to the CSV file
-csv_path = "C:/temp/Pegatron/test/smart-factory-agent/data/sensors_processed2.csv"
-
-# schedule the ordered cycle (adjust interval as needed)
-schedule.every(0.1).minutes.do(run_cycle)
-print("Agent started. Running simulate_sensor_data -> run_detect every 1 minute...")
-
-while True:
-    schedule.run_pending()
-    time.sleep(0.1)

@@ -5,8 +5,8 @@ This package contains the core code for the Smart Factory Alert Agent described 
 ## Structure
 - `src/` - Python source files
   - `preprocess.py` - data loading & preprocessing utilities
-  - `rule_engine.py` - deterministic rule-based anomaly detector and suggestions
-  - `models.py` - ML model wrappers (IsolationForest + RandomForest supervised baseline)
+  - `rule_engine.py` - deterministic rule-based alert and action suggestions
+  - `models.py` - ML model wrappers (RandomForest, LightGBM, Logistic Regression supervised baseline)
   - `agent.py` - CLI entrypoint to run the agent on a CSV file
   - `utils.py` - helper functions (save/load, plotting)
 - `data/`
@@ -14,19 +14,42 @@ This package contains the core code for the Smart Factory Alert Agent described 
 - `requirements.txt` - Python dependencies
 
 ## Quickstart
-1. Create a Python environment (Python 3.9+ recommended) and install:
+#### 1. Create a Python environment (Python 3.9+ recommended) and install:
 ```
-pip install -r requirements.txt
+$ pip install -r requirements.txt
 ```
-2. Put your sensor CSV at `data/sensors.csv` (or provide path) with columns:
-`timestamp,temp,pressure,vibration,label` (label optional for training/eval).
-3. Run the agent in batch mode:
+
+#### 2. The default online-stream CSV at `data/online_stream.csv` (or provide path) with columns: `timestamp,temp,pressure,vibration,label` (label optional for training/eval).
+
+#### 3. Generate some dummy dataset
 ```
-python src/agent.py --input data/sensors.csv --output-dir outputs --mode detect
+$ python src/generate_data.py --rows 500
 ```
-This will produce `outputs/anomalies.csv`, `outputs/alerts.json`, and a plot `outputs/signals.png`.
+The arguments that can be set are listed below:
+* `--rows` : Number of data point to be generated (100-500)
+* `--interval` : Interval in minutes between rows
+* `--out` : Output CSV path
+
+#### 4. Preprocess the generated dataset
+```
+$ python src/preprocess.py
+```
+There are several arguments that can be set, listed below:
+* `--input` : Path to input CSV
+* `--out` : Output CSV path
+* `--fill-method` : Filling method used in handling missing data, can be `ffill` or `median`.
+
+#### 5. Run the agent in real-time mode:
+```
+$ python src/agent.py --input data/sensors.csv --output-dir outputs
+```
+There are several arguments that can be used here:
+* `--input` : Path to input CSV
+* `--output-dir` : Directory to write outputs
+* `--train-if-no-model` : Bool to train model if no model found
+* `--verbose` : Integer option: [0, 1, 2], the higher the more logging info
 
 ## Notes
-- The code is intentionally minimal and dependency-light. The IsolationForest is used as an unsupervised detector. A supervised RandomForest trainer is included if you have `label` column in your CSV.
-- No dummy data is included per your request; use your own CSV or populate `data/template.csv`.
+- The code is intentionally minimal and dependency-light. A supervised RandomForest trainer is included if you don't want to train from scratch.
+- The default datetime interval in generated data is 1 minute, however for demo purpose, we don't really set the data reading interval to be 1 minute.
 

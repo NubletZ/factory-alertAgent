@@ -48,8 +48,7 @@ def generate_data_point(prev_data, dtype):
 
     # apply smoothing formula
     final_data = (2 * candidate + prev_data) / 3.0
-    # temps.append(final_temp)
-    # prev_temp = final_temp
+    
     if dtype == "temp":
         return final_data * 100
     return final_data

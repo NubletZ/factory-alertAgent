@@ -3,10 +3,11 @@ preprocess.py - load and preprocess sensor CSV for the Smart Factory Agent.
 
 Functions:
 - load_data(path): load CSV, parse timestamp column
-- preprocess(df): basic cleaning, imputation, scaling and feature engineering
+- preprocess(df): basic cleaning, imputation
 """ 
 import pandas as pd
 import numpy as np
+import argparse
 
 def load_data(path: str) -> pd.DataFrame:
     df = pd.read_csv(path)
@@ -25,18 +26,19 @@ def preprocess(df: pd.DataFrame, fill_method: str = "ffill", window: int = 5) ->
         df[["temp", "pressure", "vibration"]] = df[["temp", "pressure", "vibration"]].ffill().bfill()
     elif fill_method == "median":
         df[["temp","pressure","vibration"]] = df[["temp","pressure","vibration"]].fillna(df[["temp","pressure","vibration"]].median())
-    # Feature engineering: rolling mean/std and z-score
-    # for col in ["temp","pressure","vibration"]:
-    #     if col in df.columns:
-    #         df[f"{col}_rm"] = df[col].rolling(window=window, min_periods=1).mean()
-    #         df[f"{col}_rs"] = df[col].rolling(window=window, min_periods=1).std().fillna(0.0)
-    #         # z-score (using rolling mean/std)
-    #         df[f"{col}_z"] = (df[col] - df[f"{col}_rm"]) / (df[f"{col}_rs"].replace({0: np.nan}))
-    #         df[f"{col}_z"] = df[f"{col}_z"].fillna(0.0)
     return df
 
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--fill-method", type=str, default="ffill", help="Option: [median, ffill]")
+    parser.add_argument("--input", type=str, default="data/sensors.csv", help="Input CSV path")
+    parser.add_argument("--out", type=str, default="data/sensors_processed.csv", help="Output CSV path")
+    args = parser.parse_args()
 
-# TEST
-df = load_data("C:/temp/Pegatron/test/smart-factory-agent/data/sensors.csv")
-df = preprocess(df, fill_method="median")
-df.to_csv("data/sensors_processed.csv", index=False)
+    df = load_data(args.input)
+    df = preprocess(df, fill_method=args.fill_method)
+    df.to_csv(args.out, index=False)
+    print(f"The preprocessed data is saved to {args.out}")
+
+if __name__ == "__main__":
+    main()
