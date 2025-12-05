@@ -1,4 +1,4 @@
-# Smart Factory Alert Agent - Code Package 
+# Smart Factory Alert Agent - Code Package
 
 This package contains the core code for the Smart Factory Alert Agent described in the assignment. It **does not** include generated dummy sensor data. A template CSV is provided at `data/template.csv` (header-only).
 
