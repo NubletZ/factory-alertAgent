@@ -10,9 +10,7 @@ This package contains the core code for the Smart Factory Alert Agent described 
   - `agent.py` - CLI entrypoint to run the agent on a CSV file
   - `utils.py` - helper functions (save/load, plotting)
 - `data/`
-  - `sensors.csv` - Provided unprocessed dummy data
-  - `sensors_processed.csv` - Provided clean dummy data
-  - `online_streams.csv` - Default data when running real-time anomaly alert
+  - `template.csv` - CSV header template (no rows)
 - `requirements.txt` - Python dependencies
 
 ## Quickstart
@@ -43,14 +41,15 @@ There are several arguments that can be set, listed below:
 
 #### 5. Run the agent in real-time mode:
 ```
-$ python src/agent.py --input data/sensors_processed.csv
+$ python src/agent.py --input data/sensors.csv --output-dir outputs
 ```
 There are several arguments that can be used here:
 * `--input` : Path to input CSV
+* `--output-dir` : Directory to write outputs
 * `--train-if-no-model` : Bool to train model if no model found
 * `--verbose` : Integer option: [0, 1, 2], the higher the more logging info
 
 ## Notes
 - The code is intentionally minimal and dependency-light. A supervised RandomForest trainer is included if you don't want to train from scratch.
-- The default datetime interval in generated data is 1 minute, however, for demo purpose we don't really set the data reading interval to be 1 minute.
+- The default datetime interval in generated data is 1 minute, however for demo purpose, we don't really set the data reading interval to be 1 minute.
 

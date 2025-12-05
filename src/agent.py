@@ -20,7 +20,7 @@ from generate_data import generate_data
 
 MODEL_PATH = "model/randomforest.pth"
 
-def run_detect(input_csv: str, train_if_no_model: bool = True, verbose: int = 1):
+def run_detect(input_csv: str, output_dir: str = None, train_if_no_model: bool = True, verbose: int = 1):
     if verbose == 2: print("Read sensor input..")
     df = load_data(input_csv).tail(10)
     
@@ -92,14 +92,14 @@ def simulate_sensor_data(input_csv: str):
 
 
 # Schedule the function to run every minute
-def run_cycle(input_csv: str, output_dir: str = None, train_if_no_model: bool = True, verbose: int = 1):
+def run_cycle(input_csv: str, output_dir: str = None, train_if_no_model: bool = True):
     # run multiple tasks in order; wrap in try/except so one failure doesn't stop subsequent tasks
     try:
         simulate_sensor_data(input_csv)
     except Exception as e:
         print("simulate_sensor_data failed:", e)
     try:
-        run_detect(input_csv, train_if_no_model, verbose)
+        run_detect(input_csv)
     except Exception as e:
         print("run_detect failed:", e)
 
@@ -107,10 +107,11 @@ def run_cycle(input_csv: str, output_dir: str = None, train_if_no_model: bool = 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", default='data/online_stream.csv', help="Path to input CSV")
-    parser.add_argument("--train-if-no-model", default=True, type=bool, help="Bool to train model if no model found")
-    parser.add_argument("--verbose", default=1, type=int, help="Integer option: [0, 1, 2], the higher the more logging info")
+    parser.add_argument("--output-dir", default=None, help="Directory to write outputs")
+    parser.add_argument("--train-if-no-model", default=True, help="Bool to train model if no model found")
+    parser.add_argument("--verbose", default=1, help="Integer option: [0, 1, 2], the higher the more logging info")
     args = parser.parse_args()
-    schedule.every(0.1).minutes.do(run_cycle, input_csv=args.input, train_if_no_model=args.train_if_no_model, verbose=args.verbose)
+    schedule.every(0.1).minutes.do(run_cycle, input_csv=args.input, output_dir=args.output_dir, train_if_no_model=args.train_if_no_model)
     print("Agent started. Running receive sensor input -> detect anomaly every 1 minute...")
 
     while True:
